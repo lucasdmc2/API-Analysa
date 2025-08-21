@@ -8,16 +8,16 @@ from typing import Optional
 import uuid
 from datetime import datetime
 
-from core.supabase_client import supabase_client
-from services.storage_service import StorageService
-from services.ocr_service import OCRService
-from services.parser_service import biomarker_parser
-from services.biomarker_service import biomarker_service
-from models.exam import (
+from src.core.supabase_client import supabase_client
+from src.services.storage_service import StorageService
+from src.services.ocr_service import OCRService
+from src.services.parser_service import biomarker_parser
+from src.services.biomarker_service import biomarker_service
+from src.models.exam import (
     ExamUploadRequest, ExamUploadResponse, ExamProcessingStatus,
     ExamStatus, ExamFileInfo
 )
-from core.logging import api_logger
+from src.core.logging import api_logger
 
 router = APIRouter()
 
@@ -99,7 +99,7 @@ async def upload_exam(
         
         # Insere na tabela exams
         try:
-            result = supabase_client.get_table("exams").insert(exam_data).execute()
+            result = supabase_client().get_table("exams").insert(exam_data).execute()
             
             if not result.data:
                 raise Exception("Falha ao inserir exame no banco")
@@ -172,7 +172,7 @@ async def get_exam_status(exam_id: str, user_id: str):
     """
     try:
         # Busca exame no banco
-        result = supabase_client.get_table("exams").select("*").eq("id", exam_id).execute()
+        result = supabase_client().get_table("exams").select("*").eq("id", exam_id).execute()
         
         if not result.data:
             raise HTTPException(
@@ -225,7 +225,7 @@ async def get_exam_result(exam_id: str, user_id: str):
     """
     try:
         # Busca exame no banco
-        result = supabase_client.get_table("exams").select("*").eq("id", exam_id).execute()
+        result = supabase_client().get_table("exams").select("*").eq("id", exam_id).execute()
         
         if not result.data:
             raise HTTPException(
@@ -250,7 +250,7 @@ async def get_exam_result(exam_id: str, user_id: str):
             )
         
         # Busca biomarcadores relacionados
-        biomarkers_result = supabase_client.get_table("biomarkers").select("*").eq("exam_id", exam_id).execute()
+        biomarkers_result = supabase_client().get_table("biomarkers").select("*").eq("exam_id", exam_id).execute()
         biomarkers = biomarkers_result.data if biomarkers_result.data else []
         
         # Se não há biomarcadores mas o OCR foi concluído, processa novamente
@@ -264,7 +264,7 @@ async def get_exam_result(exam_id: str, user_id: str):
                 biomarkers = biomarker_result["biomarkers"]
                 # Atualiza o exame com o resumo
                 if biomarker_result.get("summary"):
-                    supabase_client.get_table("exams").update({
+                    supabase_client().get_table("exams").update({
                         "biomarker_summary": biomarker_result["summary"]["summary_text"],
                         "updated_at": datetime.now().isoformat()
                     }).eq("id", exam_id).execute()
@@ -328,7 +328,7 @@ async def process_exam_background(exam_id: str, file_content: bytes, mime_type: 
     """
     try:
         # Atualiza status para PROCESSING
-        supabase_client.get_table("exams").update({
+        supabase_client().get_table("exams").update({
             "status": ExamStatus.PROCESSING.value,
             "processing_started_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -346,7 +346,7 @@ async def process_exam_background(exam_id: str, file_content: bytes, mime_type: 
         
         if not ocr_result["success"]:
             # Falha no OCR
-            supabase_client.get_table("exams").update({
+            supabase_client().get_table("exams").update({
                 "status": ExamStatus.FAILED.value,
                 "updated_at": datetime.now().isoformat()
             }).eq("id", exam_id).execute()
@@ -377,7 +377,7 @@ async def process_exam_background(exam_id: str, file_content: bytes, mime_type: 
         if biomarker_result["success"] and biomarker_result.get("summary"):
             update_data["biomarker_summary"] = biomarker_result["summary"]["summary_text"]
         
-        supabase_client.get_table("exams").update(update_data).eq("id", exam_id).execute()
+        supabase_client().get_table("exams").update(update_data).eq("id", exam_id).execute()
         
         # Log de sucesso
         api_logger.log_operation(
@@ -392,7 +392,7 @@ async def process_exam_background(exam_id: str, file_content: bytes, mime_type: 
         
     except Exception as e:
         # Falha no processamento
-        supabase_client.get_table("exams").update({
+        supabase_client().get_table("exams").update({
             "status": ExamStatus.FAILED.value,
             "updated_at": datetime.now().isoformat()
         }).eq("id", exam_id).execute()
