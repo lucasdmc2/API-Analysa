@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./src:/app/src
+      - ./uploads:/app/uploads
+    depends_on:
+      - redis
+    networks:
+      - api-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - api-network
+
+  # Supabase local para desenvolvimento (opcional)
+  # supabase:
+  #   image: supabase/supabase-dev
+  #   ports:
+  #     - "5432:5432"
+  #     - "8000:8000"
+  #   environment:
+  #     - POSTGRES_PASSWORD=postgres
+  #   volumes:
+  #     - supabase_data:/var/lib/postgresql/data
+  #   networks:
+  #     - api-network
+
+volumes:
+  redis_data:
+
+networks:
+  api-network:
+    driver: bridge
