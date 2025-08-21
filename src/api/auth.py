@@ -7,9 +7,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
-from core.supabase_client import supabase_client
-from core.logging import api_logger
-from models.auth import (
+from src.core.supabase_client import supabase_client
+from src.core.logging import api_logger
+from src.models.auth import (
     UserRegisterRequest, UserRegisterResponse,
     UserLoginRequest, UserLoginResponse,
     UserProfile, UserProfileUpdate
@@ -45,7 +45,7 @@ async def register_user(request: UserRegisterRequest) -> UserRegisterResponse:
             )
         
         # Registra usuário no Supabase Auth
-        auth_result = await supabase_client.sign_up(
+        auth_result = await supabase_client().sign_up(
             email=request.email,
             password=request.password,
             user_metadata={
@@ -109,7 +109,7 @@ async def login_user(request: UserLoginRequest) -> UserLoginResponse:
     """
     try:
         # Autentica usuário no Supabase
-        auth_result = await supabase_client.sign_in(
+        auth_result = await supabase_client().sign_in(
             email=request.email,
             password=request.password
         )
@@ -121,7 +121,7 @@ async def login_user(request: UserLoginRequest) -> UserLoginResponse:
             )
         
         # Busca perfil completo do usuário
-        user_profile = await supabase_client.get_current_user(
+        user_profile = await supabase_client().get_current_user(
             auth_result["access_token"]
         )
         
@@ -187,7 +187,7 @@ async def get_current_user_profile(
     """
     try:
         # Valida token e busca usuário
-        user_result = await supabase_client.get_current_user(
+        user_result = await supabase_client().get_current_user(
             credentials.credentials
         )
         
@@ -240,7 +240,7 @@ async def update_user_profile(
     """
     try:
         # Valida token e busca usuário
-        user_result = await supabase_client.get_current_user(
+        user_result = await supabase_client().get_current_user(
             credentials.credentials
         )
         
@@ -256,7 +256,7 @@ async def update_user_profile(
         update_data = profile_update.dict(exclude_unset=True)
         update_data["updated_at"] = datetime.now().isoformat()
         
-        result = supabase_client.get_table("users").update(update_data).eq("id", user_id).execute()
+        result = supabase_client().get_table("users").update(update_data).eq("id", user_id).execute()
         
         if not result.data:
             raise HTTPException(
@@ -265,7 +265,7 @@ async def update_user_profile(
             )
         
         # Busca perfil atualizado
-        updated_user = await supabase_client.get_current_user(credentials.credentials)
+        updated_user = await supabase_client().get_current_user(credentials.credentials)
         
         # Log da operação
         api_logger.log_operation(
@@ -316,7 +316,7 @@ async def logout_user(
     """
     try:
         # Valida token
-        user_result = await supabase_client.get_current_user(
+        user_result = await supabase_client().get_current_user(
             credentials.credentials
         )
         
@@ -368,7 +368,7 @@ async def refresh_access_token(
     """
     try:
         # Renova token no Supabase
-        result = await supabase_client.refresh_token(refresh_token)
+        result = await supabase_client().refresh_token(refresh_token)
         
         if not result["success"]:
             raise HTTPException(
