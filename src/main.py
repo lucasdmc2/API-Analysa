@@ -1,5 +1,5 @@
 """
-Aplicação principal FastAPI para API de Exames Médicos.
+Aplicação principal FastAPI para API de Processamento de Exames Médicos.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -11,39 +11,23 @@ from contextlib import asynccontextmanager
 from .core.config import get_settings_lazy
 from .core.logging import setup_logging
 
-
 # Configuração de logging
 setup_logging()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle da aplicação."""
-    # Startup
-    structlog.get_logger().info("Iniciando API de Exames Médicos")
-    
-    # Validações de startup
-    try:
-        # Aqui podemos adicionar validações de conexão com Supabase
-        # e outras dependências
-        pass
-    except Exception as e:
-        structlog.get_logger().error(f"Erro na inicialização: {e}")
-        raise
-    
+    structlog.get_logger().info("Iniciando API de Processamento de Exames Médicos")
     yield
-    
-    # Shutdown
-    structlog.get_logger().info("Encerrando API de Exames Médicos")
-
+    structlog.get_logger().info("Encerrando API de Processamento de Exames Médicos")
 
 # Criação da aplicação FastAPI
 def create_app():
-    """Cria a aplicação FastAPI."""
+    """Cria a aplicação FastAPI simplificada."""
     return FastAPI(
-        title="API de Exames Médicos",
-        version="1.0.0",
-        description="API para processamento de exames médicos via OCR com LGPD compliance",
+        title="API de Processamento de Exames Médicos",
+        version="2.0.0",
+        description="API simplificada para processamento de exames médicos via OCR",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan
@@ -52,40 +36,34 @@ def create_app():
 # Instância da aplicação
 app = create_app()
 
-# Configuração de CORS
+# Configuração de CORS simplificada
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configurar adequadamente para produção
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Removido - não precisamos mais
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 async def root():
-    """Endpoint raiz da API."""
+    """Endpoint raiz da API simplificada."""
     return {
-        "message": "API de Exames Médicos",
-        "version": get_settings_lazy().app_version,
+        "message": "API de Processamento de Exames Médicos",
+        "version": "2.0.0",
         "status": "running"
     }
-
 
 @app.get("/health")
 async def health_check():
     """Endpoint de verificação de saúde da API."""
     try:
-        # Aqui podemos adicionar verificações de saúde
-        # como conexão com banco, storage, etc.
         return {
             "status": "healthy",
-            "timestamp": "2024-01-01T00:00:00Z",
-            "version": get_settings_lazy().app_version
+            "version": "2.0.0"
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
-
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -105,20 +83,12 @@ async def global_exception_handler(request, exc):
         }
     )
 
-
-# Importar e incluir routers
-from api import exams
-from api import auth
-from api import patients
-
-app.include_router(exams.router, prefix="/api/v1/exams", tags=["exams"])
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(patients.router, prefix="/api/v1/patients", tags=["patients"])
-
+# APENAS router de exames (simplificado)
+from src.api import exams
+app.include_router(exams.router, prefix="/exams", tags=["exams"])
 
 if __name__ == "__main__":
     import uvicorn
-    
     uvicorn.run(
         "src.main:app",
         host="0.0.0.0",

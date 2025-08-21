@@ -10,8 +10,8 @@ from supabase import Client
 import asyncio
 import mimetypes
 
-from core.config import get_settings_lazy
-from core.logging import api_logger
+from src.core.config import get_settings_lazy
+from src.core.logging import api_logger
 
 
 class StorageService:

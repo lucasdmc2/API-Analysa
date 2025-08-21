@@ -12,8 +12,8 @@ from typing import Dict, Any, Optional
 import tempfile
 import os
 
-from core.config import get_settings_lazy
-from core.logging import api_logger
+from src.core.config import get_settings_lazy
+from src.core.logging import api_logger
 
 
 class OCRService:
@@ -150,7 +150,7 @@ class OCRService:
                 lambda: pytesseract.image_to_string(
                     image, 
                     config=self.tesseract_config,
-                    lang=settings.tesseract_lang if hasattr(settings, 'tesseract_lang') else 'por+eng'
+                    lang=config.tesseract_lang if hasattr(config, 'tesseract_lang') else 'por+eng'
                 )
             )
             return text.strip()
@@ -263,7 +263,7 @@ class OCRService:
             return {
                 "success": True,
                 "languages": languages,
-                "current_language": getattr(settings, 'tesseract_lang', 'por+eng')
+                "current_language": getattr(config, 'tesseract_lang', 'por+eng')
             }
             
         except Exception as e:

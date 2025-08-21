@@ -6,7 +6,7 @@ import re
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
-from core.logging import api_logger
+from src.core.logging import api_logger
 
 
 class BiomarkerParser:

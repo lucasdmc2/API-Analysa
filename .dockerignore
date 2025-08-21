@@ -1,0 +1,60 @@
+# Arquivos de desenvolvimento
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testes
+tests/
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
+
+# Documentação
+docs/
+*.md
+!README.md
+
+# Configurações de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Supabase local
+supabase/
+
+# Scripts de setup
+scripts/setup/
+scripts/migrations/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Railway
+railway.json
+
+# Ambiente
+.env
+.env.*
+!env.example
