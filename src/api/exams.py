@@ -450,7 +450,7 @@ async def test_upload_exam(
             )
         
         # Inicializa serviços
-        storage_service = StorageService(supabase_client())
+        storage_service = StorageService(supabase_client().supabase)
         ocr_service = OCRService()
         
         # Upload para Supabase Storage
@@ -567,7 +567,7 @@ async def test_get_exam_result(exam_id: str):
                     }).eq("id", exam_id).execute()
         
         # Busca informações do arquivo
-        storage_service = StorageService(supabase_client())
+        storage_service = StorageService(supabase_client().supabase)
         file_info = await storage_service.get_file_info(exam["file_path"])
         
         # Gera link assinado atualizado
