@@ -7,9 +7,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from core.supabase_client import supabase_client
-from core.logging import api_logger
-from models.patient import (
+from src.core.supabase_client import supabase_client
+from src.core.logging import api_logger
+from src.models.patient import (
     PatientCreate, PatientUpdate, PatientResponse,
     PatientListResponse, PatientSearchParams
 )
@@ -32,7 +32,7 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
         HTTPException: Se token inválido
     """
     try:
-        user_result = await supabase_client.get_current_user(credentials.credentials)
+        user_result = await supabase_client().get_current_user(credentials.credentials)
         
         if not user_result["success"]:
             raise HTTPException(
@@ -70,7 +70,7 @@ async def create_patient(
     """
     try:
         # Valida CPF único
-        existing_patient = supabase_client.get_table("patients").select("id").eq("cpf", patient_data.cpf).execute()
+        existing_patient = supabase_client().get_table("patients").select("id").eq("cpf", patient_data.cpf).execute()
         
         if existing_patient.data:
             raise HTTPException(
@@ -85,7 +85,7 @@ async def create_patient(
         insert_data["updated_at"] = datetime.now().isoformat()
         
         # Insere paciente no banco
-        result = supabase_client.get_table("patients").insert(insert_data).execute()
+        result = supabase_client().get_table("patients").insert(insert_data).execute()
         
         if not result.data:
             raise HTTPException(
@@ -153,7 +153,7 @@ async def list_patients(
     """
     try:
         # Constrói query base
-        query = supabase_client.get_table("patients").select("*").eq("doctor_id", current_user_id)
+        query = supabase_client().get_table("patients").select("*").eq("doctor_id", current_user_id)
         
         # Aplica filtro de busca se fornecido
         if search:
