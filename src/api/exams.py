@@ -422,3 +422,187 @@ def _get_status_message(status: str) -> str:
 # Import necessário para asyncio.create_task
 import asyncio
 from datetime import timedelta
+
+# Endpoint de teste temporário (sem autenticação)
+@router.post("/test-upload", response_model=ExamUploadResponse)
+async def test_upload_exam(
+    file: UploadFile = File(..., description="Arquivo do exame (PDF, PNG, JPG, TXT)")
+):
+    """
+    Endpoint de teste para upload sem autenticação.
+    APENAS PARA TESTES - REMOVER EM PRODUÇÃO!
+    """
+    try:
+        # Validações básicas
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Nome do arquivo é obrigatório"
+            )
+        
+        # Lê conteúdo do arquivo
+        file_content = await file.read()
+        
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Arquivo vazio"
+            )
+        
+        # Inicializa serviços
+        storage_service = StorageService(supabase_client())
+        ocr_service = OCRService()
+        
+        # Upload para Supabase Storage
+        upload_result = await storage_service.upload_file(
+            file_content=file_content,
+            file_name=file.filename,
+            mime_type=file.content_type
+        )
+        
+        if not upload_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro no upload: {upload_result['error']}"
+            )
+        
+        # Gera ID único para o exame
+        exam_id = str(uuid.uuid4())
+        
+        # Cria registro no banco (sem user_id/patient_id para teste)
+        exam_data = {
+            "id": exam_id,
+            "patient_id": "test_patient",
+            "user_id": "test_user",
+            "file_name": file.filename,
+            "file_path": upload_result["file_path"],
+            "file_size": upload_result["file_size"],
+            "file_type": upload_result["mime_type"],
+            "mime_type": upload_result["mime_type"],
+            "status": ExamStatus.PENDING.value,
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Insere na tabela exams
+        try:
+            result = supabase_client().get_table("exams").insert(exam_data).execute()
+            
+            if not result.data:
+                raise Exception("Falha ao inserir exame no banco")
+                
+        except Exception as e:
+            # Rollback: remove arquivo do storage se falhar no banco
+            await storage_service.delete_file(upload_result["file_path"])
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao salvar exame: {str(e)}"
+            )
+        
+        # Inicia processamento OCR em background
+        asyncio.create_task(
+            process_exam_background(
+                exam_id=exam_id,
+                file_content=file_content,
+                mime_type=upload_result["mime_type"],
+                file_name=file.filename
+            )
+        )
+        
+        return ExamUploadResponse(
+            exam_id=exam_id,
+            file_name=file.filename,
+            file_size=upload_result["file_size"],
+            file_type=upload_result["mime_type"],
+            status=ExamStatus.PENDING,
+            upload_timestamp=datetime.now(),
+            message="Exame enviado com sucesso. Processamento OCR iniciado."
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno no upload do exame: {str(e)}"
+        )
+
+# Endpoint de teste para obter resultado sem autenticação
+@router.get("/test-result/{exam_id}")
+async def test_get_exam_result(exam_id: str):
+    """
+    Endpoint de teste para obter resultado sem autenticação.
+    APENAS PARA TESTES - REMOVER EM PRODUÇÃO!
+    """
+    try:
+        # Busca exame no banco
+        result = supabase_client().get_table("exams").select("*").eq("id", exam_id).execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exame não encontrado"
+            )
+        
+        exam = result.data[0]
+        
+        # Busca biomarcadores relacionados
+        biomarkers_result = supabase_client().get_table("biomarkers").select("*").eq("exam_id", exam_id).execute()
+        biomarkers = biomarkers_result.data if biomarkers_result.data else []
+        
+        # Se não há biomarcadores mas o OCR foi concluído, processa novamente
+        if not biomarkers and exam.get("ocr_text"):
+            biomarker_result = await biomarker_service.process_exam_biomarkers(
+                exam_id, 
+                exam["ocr_text"]
+            )
+            
+            if biomarker_result["success"]:
+                biomarkers = biomarker_result["biomarkers"]
+                # Atualiza o exame com o resumo
+                if biomarker_result.get("summary"):
+                    supabase_client().get_table("exams").update({
+                        "biomarker_summary": biomarker_result["summary"]["summary_text"],
+                        "updated_at": datetime.now().isoformat()
+                    }).eq("id", exam_id).execute()
+        
+        # Busca informações do arquivo
+        storage_service = StorageService(supabase_client())
+        file_info = await storage_service.get_file_info(exam["file_path"])
+        
+        # Gera link assinado atualizado
+        signed_url = await storage_service._generate_signed_url(exam["file_path"])
+        
+        # Monta resposta
+        file_info_model = ExamFileInfo(
+            file_name=exam["file_name"],
+            file_path=exam["file_path"],
+            file_size=exam["file_size"],
+            mime_type=exam["mime_type"],
+            uploaded_at=datetime.fromisoformat(exam["created_at"]),
+            signed_url=signed_url,
+            expires_at=datetime.now() + timedelta(seconds=storage_service.signed_url_expiry)
+        )
+        
+        return {
+            "exam_id": exam_id,
+            "patient_id": exam["patient_id"],
+            "user_id": exam["user_id"],
+            "file_info": file_info_model,
+            "status": ExamStatus(exam["status"]),
+            "ocr_text": exam.get("ocr_text"),
+            "ocr_confidence": exam.get("ocr_confidence"),
+            "biomarkers": biomarkers,
+            "processing_started_at": exam.get("processing_started_at"),
+            "processing_completed_at": exam.get("processing_completed_at"),
+            "created_at": datetime.fromisoformat(exam["created_at"]),
+            "updated_at": datetime.fromisoformat(exam["updated_at"])
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter resultado do exame: {str(e)}"
+        )
