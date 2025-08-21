@@ -6,9 +6,9 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 import asyncio
 
-from core.supabase_client import supabase_client
-from services.parser_service import biomarker_parser
-from core.logging import api_logger
+from src.core.supabase_client import supabase_client
+from src.services.parser_service import biomarker_parser
+from src.core.logging import api_logger
 
 
 class BiomarkerService:
@@ -91,7 +91,7 @@ class BiomarkerService:
             Lista de ranges de referência
         """
         try:
-            result = supabase_client.get_table("reference_ranges").select("*").eq("is_active", True).execute()
+            result = supabase_client().get_table("reference_ranges").select("*").eq("is_active", True).execute()
             return result.data if result.data else []
         except Exception as e:
             api_logger.log_error(
@@ -474,7 +474,7 @@ class BiomarkerService:
                                if k in ["exam_id", "name", "normalized_name", "value", "unit", 
                                        "reference_range_id", "status", "confidence_score", "raw_text"]}
                 
-                supabase_client.get_table("biomarkers").insert(db_biomarker).execute()
+                supabase_client().get_table("biomarkers").insert(db_biomarker).execute()
             
             return True
             
