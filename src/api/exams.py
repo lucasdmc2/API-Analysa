@@ -606,3 +606,142 @@ async def test_get_exam_result(exam_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao obter resultado do exame: {str(e)}"
         )
+
+# Endpoint de teste para processamento direto (sem storage)
+@router.post("/test-process", response_model=ExamUploadResponse)
+async def test_process_exam_directly(
+    file: UploadFile = File(..., description="Arquivo do exame (PDF, PNG, JPG, TXT)")
+):
+    """
+    Endpoint de teste para processamento direto sem storage.
+    APENAS PARA TESTES - REMOVER EM PRODUÇÃO!
+    """
+    try:
+        # Validações básicas
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Nome do arquivo é obrigatório"
+            )
+        
+        # Lê conteúdo do arquivo
+        file_content = await file.read()
+        
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Arquivo vazio"
+            )
+        
+        print(f"📁 Arquivo recebido: {file.filename} ({len(file_content)} bytes)")
+        
+        # Gera ID único para o exame
+        exam_id = str(uuid.uuid4())
+        
+        # Inicializa OCR service
+        ocr_service = OCRService()
+        
+        # Processa OCR diretamente
+        print("🔍 Processando OCR...")
+        ocr_result = await ocr_service.process_file_from_bytes(
+            file_content=file_content,
+            file_type=file.content_type,
+            file_name=file.filename
+        )
+        
+        if not ocr_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro no OCR: {ocr_result['error']}"
+            )
+        
+        print(f"✅ OCR concluído: {len(ocr_result['ocr_text'])} caracteres")
+        
+        # Processa biomarcadores
+        print("🔬 Processando biomarcadores...")
+        biomarker_result = await biomarker_service.process_exam_biomarkers(
+            exam_id, 
+            ocr_result["ocr_text"]
+        )
+        
+        print(f"✅ Biomarcadores processados: {len(biomarker_result.get('biomarkers', []))} encontrados")
+        
+        # Cria registro no banco (sem file_path)
+        exam_data = {
+            "id": exam_id,
+            "patient_id": "test_patient",
+            "user_id": "test_user",
+            "file_name": file.filename,
+            "file_path": f"test/{exam_id}/{file.filename}",
+            "file_size": len(file_content),
+            "file_type": file.content_type,
+            "mime_type": file.content_type,
+            "status": ExamStatus.COMPLETED.value,
+            "ocr_text": ocr_result["ocr_text"],
+            "ocr_confidence": ocr_result.get("confidence", 0.0),
+            "processing_started_at": datetime.now().isoformat(),
+            "processing_completed_at": datetime.now().isoformat(),
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Adiciona resumo de biomarcadores se disponível
+        if biomarker_result["success"] and biomarker_result.get("summary"):
+            exam_data["biomarker_summary"] = biomarker_result["summary"]["summary_text"]
+        
+        # Insere na tabela exams
+        try:
+            result = supabase_client().get_table("exams").insert(exam_data).execute()
+            
+            if not result.data:
+                raise Exception("Falha ao inserir exame no banco")
+                
+        except Exception as e:
+            print(f"⚠️  Erro ao salvar no banco: {str(e)}")
+            # Continua mesmo se falhar no banco
+        
+        # Salva biomarcadores se disponível
+        if biomarker_result["success"] and biomarker_result.get("biomarkers"):
+            try:
+                for biomarker in biomarker_result["biomarkers"]:
+                    db_biomarker = {
+                        "exam_id": exam_id,
+                        "biomarker_name": biomarker.get("name", ""),
+                        "normalized_name": biomarker.get("normalized_name", ""),
+                        "value": biomarker.get("value", 0),
+                        "unit": biomarker.get("unit", ""),
+                        "status": biomarker.get("status", "unknown"),
+                        "severity": biomarker.get("severity", "none"),
+                        "reference_min": biomarker.get("reference_min"),
+                        "reference_max": biomarker.get("reference_max"),
+                        "created_at": datetime.now().isoformat()
+                    }
+                    supabase_client().get_table("biomarkers").insert(db_biomarker).execute()
+                
+                print(f"✅ {len(biomarker_result['biomarkers'])} biomarcadores salvos no banco")
+            except Exception as e:
+                print(f"⚠️  Erro ao salvar biomarcadores: {str(e)}")
+        
+        # Limpa recursos do OCR
+        ocr_service.cleanup()
+        
+        print(f"🎉 Processamento completo! ID: {exam_id}")
+        
+        return ExamUploadResponse(
+            exam_id=exam_id,
+            file_name=file.filename,
+            file_size=len(file_content),
+            file_type=file.content_type,
+            status=ExamStatus.COMPLETED,
+            upload_timestamp=datetime.now(),
+            message=f"Exame processado com sucesso! OCR: {len(ocr_result['ocr_text'])} chars, Biomarcadores: {len(biomarker_result.get('biomarkers', []))}"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Erro no processamento: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno no processamento: {str(e)}"
+        )
