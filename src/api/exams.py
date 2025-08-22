@@ -25,16 +25,16 @@ router = APIRouter()
 @router.post("/upload", response_model=ExamUploadResponse)
 async def upload_exam(
     file: UploadFile = File(..., description="Arquivo do exame (PDF, PNG, JPG, TXT)"),
-    patient_id: str = Form(..., description="ID do paciente"),
-    user_id: str = Form(..., description="ID do usuário/médico")
+    patient_name: str = Form("", description="Nome do paciente (opcional)"),
+    notes: str = Form("", description="Observações adicionais")
 ):
     """
-    Upload de exame médico com processamento OCR.
+    Upload de exame médico com processamento OCR (SIMPLIFICADO).
     
     Args:
         file: Arquivo do exame
-        patient_id: ID do paciente
-        user_id: ID do usuário/médico
+        patient_name: Nome do paciente (opcional)
+        notes: Observações adicionais
         
     Returns:
         Dados do exame criado
@@ -45,12 +45,6 @@ async def upload_exam(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Nome do arquivo é obrigatório"
-            )
-        
-        if not patient_id or not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ID do paciente e usuário são obrigatórios"
             )
         
         # Lê conteúdo do arquivo
@@ -82,11 +76,9 @@ async def upload_exam(
         # Gera ID único para o exame
         exam_id = str(uuid.uuid4())
         
-        # Cria registro no banco
+        # Cria registro no banco (SIMPLIFICADO)
         exam_data = {
             "id": exam_id,
-            "patient_id": patient_id,
-            "user_id": user_id,
             "file_name": file.filename,
             "file_path": upload_result["file_path"],
             "file_size": upload_result["file_size"],
@@ -122,13 +114,12 @@ async def upload_exam(
             )
         )
         
-        # Log da operação
+        # Log da operação (SIMPLIFICADO)
         api_logger.log_operation(
             operation="exam_upload",
-            user_id=user_id,
             details={
                 "exam_id": exam_id,
-                "patient_id": patient_id,
+                "patient_name": patient_name,
                 "file_name": file.filename,
                 "file_size": upload_result["file_size"]
             }
@@ -149,8 +140,7 @@ async def upload_exam(
     except Exception as e:
         api_logger.log_error(
             error=str(e),
-            operation="exam_upload",
-            user_id=user_id if 'user_id' in locals() else None
+            operation="exam_upload"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
