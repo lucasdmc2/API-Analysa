@@ -17,7 +17,7 @@ from src.core.logging import api_logger
 class StorageService:
     """Serviço para gerenciar uploads no Supabase Storage."""
     
-    def __init__(self, supabase_client: Client):
+    def __init__(self, supabase_client):
         self.supabase = supabase_client
         self.bucket_name = "medical-exams"
         config = get_settings_lazy()
@@ -109,7 +109,7 @@ class StorageService:
             
         for attempt in range(max_retries):
             try:
-                response = self.supabase.storage.from_(self.bucket_name).upload(
+                response = self.supabase.get_storage(self.bucket_name).upload(
                     path=name,
                     file=content,
                     file_options={"content-type": mime_type}
@@ -140,7 +140,7 @@ class StorageService:
             URL assinada para download
         """
         try:
-            response = self.supabase.storage.from_(self.bucket_name).create_signed_url(
+            response = self.supabase.get_storage(self.bucket_name).create_signed_url(
                 path=file_path.replace(f"{self.bucket_name}/", ""),
                 expires_in=self.signed_url_expiry
             )
@@ -163,7 +163,7 @@ class StorageService:
             if file_path.startswith(f"{self.bucket_name}/"):
                 file_path = file_path.replace(f"{self.bucket_name}/", "")
             
-            self.supabase.storage.from_(self.bucket_name).remove([file_path])
+            self.supabase.get_storage(self.bucket_name).remove([file_path])
             
             api_logger.log_operation(
                 operation="file_deletion",
@@ -263,7 +263,7 @@ class StorageService:
                 file_path = file_path.replace(f"{self.bucket_name}/", "")
             
             # Lista arquivos para obter informações
-            files = self.supabase.storage.from_(self.bucket_name).list(path="")
+            files = self.supabase.get_storage(self.bucket_name).list(path="")
             
             for file_info in files:
                 if file_info.name == file_path:
