@@ -19,7 +19,7 @@ class StorageService:
     
     def __init__(self, supabase_client):
         self.supabase = supabase_client
-        self.bucket_name = "medical-exams"
+        self.bucket_name = "exames-medicos"
         config = get_settings_lazy()
         self.max_file_size = config.max_file_size
         self.signed_url_expiry = config.signed_url_expiry
