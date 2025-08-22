@@ -57,7 +57,7 @@ async def upload_exam(
             )
         
         # Inicializa serviços
-        storage_service = StorageService(supabase_client)
+        storage_service = StorageService(supabase_client())
         ocr_service = OCRService()
         
         # Upload para Supabase Storage
@@ -149,13 +149,12 @@ async def upload_exam(
 
 
 @router.get("/{exam_id}/status", response_model=ExamProcessingStatus)
-async def get_exam_status(exam_id: str, user_id: str):
+async def get_exam_status(exam_id: str):
     """
-    Obtém status do processamento de um exame.
+    Obtém status do processamento de um exame (SIMPLIFICADO).
     
     Args:
         exam_id: ID do exame
-        user_id: ID do usuário para validação
         
     Returns:
         Status atual do processamento
@@ -171,13 +170,6 @@ async def get_exam_status(exam_id: str, user_id: str):
             )
         
         exam = result.data[0]
-        
-        # Valida acesso (médico só vê seus próprios exames)
-        if exam["user_id"] != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado a este exame"
-            )
         
         return ExamProcessingStatus(
             exam_id=exam_id,
@@ -202,13 +194,12 @@ async def get_exam_status(exam_id: str, user_id: str):
 
 
 @router.get("/{exam_id}/result")
-async def get_exam_result(exam_id: str, user_id: str):
+async def get_exam_result(exam_id: str):
     """
-    Obtém resultado completo de um exame.
+    Obtém resultado completo de um exame (SIMPLIFICADO).
     
     Args:
         exam_id: ID do exame
-        user_id: ID do usuário para validação
         
     Returns:
         Resultado completo com OCR e biomarcadores
@@ -224,13 +215,6 @@ async def get_exam_result(exam_id: str, user_id: str):
             )
         
         exam = result.data[0]
-        
-        # Valida acesso
-        if exam["user_id"] != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado a este exame"
-            )
         
         # Verifica se processamento foi concluído
         if exam["status"] != ExamStatus.COMPLETED.value:
@@ -557,7 +541,7 @@ async def test_get_exam_result(exam_id: str):
                     }).eq("id", exam_id).execute()
         
         # Busca informações do arquivo
-        storage_service = StorageService(supabase_client().supabase)
+        storage_service = StorageService(supabase_client())
         file_info = await storage_service.get_file_info(exam["file_path"])
         
         # Gera link assinado atualizado
